@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Лазеры против метеоров</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background:
+        radial-gradient(circle, rgba(255, 255, 255, 0.2) 1px, transparent 1px) 0 0 / 16px 16px,
+        repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.08) 0 8px, rgba(0, 0, 0, 0.03) 8px 16px),
+        linear-gradient(135deg, #ffe66d, #ff9f68 48%, #ff5d8f);
+      font-family: "Comic Sans MS", "Trebuchet MS", "Arial Black", Arial, sans-serif;
+      color: #111;
+    }
+
+    .game-wrap {
+      width: min(92vw, 860px);
+    }
+
+    .hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+      font-size: 18px;
+      font-weight: 700;
+      background: #fff9ea;
+      border: 4px solid #111;
+      border-radius: 14px;
+      padding: 10px 14px;
+      box-shadow: 8px 8px 0 #111;
+      transform: rotate(-0.5deg);
+    }
+
+    .hint {
+      font-size: 14px;
+      font-weight: 400;
+    }
+
+    .power-label {
+      color: #ffffff;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+      letter-spacing: 0.4px;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      border: 5px solid #111;
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.2), transparent 45%),
+        linear-gradient(#3458d4, #1f2c6d);
+      display: block;
+      box-shadow: 10px 10px 0 #111;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .overlay.show {
+      display: flex;
+    }
+
+    .panel {
+      background: #fffdf2;
+      border: 5px solid #111;
+      border-radius: 18px;
+      padding: 28px 24px;
+      width: min(94vw, 420px);
+      box-shadow: 10px 10px 0 #111;
+      color: #111;
+    }
+
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 32px;
+    }
+
+    .panel p {
+      margin: 0 0 16px;
+      opacity: 0.9;
+    }
+
+    .menu-controls {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 14px;
+      text-align: left;
+    }
+
+    .menu-controls label {
+      font-size: 14px;
+      opacity: 0.92;
+    }
+
+    .records-title {
+      margin: 10px 0 8px;
+      font-size: 18px;
+      text-align: left;
+    }
+
+    .records {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 14px;
+    }
+
+    .records th,
+    .records td {
+      border-bottom: 2px dashed #222;
+      padding: 6px 2px;
+      text-align: left;
+    }
+
+    button {
+      border: 4px solid #111;
+      border-radius: 12px;
+      background: linear-gradient(#ff5f7c, #ff2d55);
+      color: #fffde8;
+      padding: 12px 18px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 5px 5px 0 #111;
+      text-transform: uppercase;
+      transition: transform 0.08s ease;
+    }
+
+    button:hover {
+      background: linear-gradient(#ff6f8a, #ff3b61);
+      transform: translate(-1px, -1px);
+    }
+
+    select {
+      border: 2px solid #111;
+      border-radius: 10px;
+      background: #fff9d6;
+      color: #111;
+      padding: 6px 10px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-wrap">
+    <div class="hud">
+      <div>Метеоры: <span id="score">0</span></div>
+      <div id="comboLabel" class="hint"></div>
+      <div id="powerLabel" class="hint power-label"></div>
+      <div class="hint">Управление: ← → или A D, ЛКМ — лазер, ПКМ — ракета, Пробел — Увайт павер</div>
+    </div>
+    <canvas id="game" width="860" height="520"></canvas>
+  </div>
+
+  <div id="startMenu" class="overlay menu-overlay show">
+    <div class="panel">
+      <h2>Лазеры против метеоров</h2>
+      <div class="menu-controls">
+        <label for="menuDifficulty">
+          Сложность:
+          <select id="menuDifficulty">
+            <option value="easy">Лёгкая</option>
+            <option value="normal" selected>Нормальная</option>
+            <option value="hard">Сложная</option>
+          </select>
+        </label>
+      </div>
+      <h3 class="records-title">Таблица рекордов</h3>
+      <table class="records">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Счёт</th>
+          </tr>
+        </thead>
+        <tbody id="recordsBody"></tbody>
+      </table>
+      <button id="startBtn" type="button">Старт</button>
+    </div>
+  </div>
+
+  <div id="gameOver" class="overlay">
+    <div class="panel">
+      <h2 id="gameOverTitle">Конец игры</h2>
+      <p>Финальный счёт: <span id="finalScore">0</span></p>
+      <button id="restartBtn" type="button">Играть снова</button>
+      <button id="menuBtn" type="button">В меню</button>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const canvas = $("game");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = $("score");
+    const finalScoreEl = $("finalScore");
+    const gameOverTitleEl = $("gameOverTitle");
+    const gameOverEl = $("gameOver");
+    const startMenuEl = $("startMenu");
+    const menuDifficultyEl = $("menuDifficulty");
+    const recordsBodyEl = $("recordsBody");
+    const comboLabelEl = $("comboLabel");
+    const powerLabelEl = $("powerLabel");
+    const startBtn = $("startBtn");
+    const restartBtn = $("restartBtn");
+    const menuBtn = $("menuBtn");
+
+    const player = { w: 86, h: 18, x: canvas.width / 2 - 43, y: canvas.height - 36, speed: 7 };
+    const keys = { left: false, right: false };
+    const recordsKey = "fallingBlocksRecords";
+    const difficulties = {
+      easy: { spawnBase: 66, spawnMin: 30, speedBase: 0.95, speedRand: 1.05, scoreScale: 0.006, speedCap: 4.8, whiteCooldown: 20000, whiteDuration: 10000 },
+      normal: { spawnBase: 52, spawnMin: 20, speedBase: 1.4, speedRand: 1.5, scoreScale: 0.01, speedCap: 5.8, whiteCooldown: 30000, whiteDuration: 10000 },
+      hard: { spawnBase: 40, spawnMin: 14, speedBase: 1.9, speedRand: 1.9, scoreScale: 0.014, speedCap: 6.8, whiteCooldown: 60000, whiteDuration: 5000 }
+    };
+    const blankRecords = () => ({ easy: [], normal: [], hard: [] });
+    const intersects = (a, b) =>
+      a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+    const EVENT_STEP = 20;
+    const COMBO_WINDOW_MS = 1600;
+    const COMBO_MAX = 6;
+    const addLaser = (eye, tx, ty) => {
+      const dx = tx - eye.x;
+      const dy = ty - eye.y;
+      const len = Math.hypot(dx, dy) || 1;
+      lasers.push({ x: eye.x - 2, y: eye.y - 2, w: 4, h: 4, vx: (dx / len) * 10, vy: (dy / len) * 10 });
+    };
+
+    let currentDifficulty = "normal";
+    let lasers = [];
+    let meteors = [];
+    let bonuses = [];
+    let rockets = [];
+    let aliens = [];
+    let score = 0;
+    let gameOver = false;
+    let hasStarted = false;
+    let spawnTimer = 0;
+    let currentSetup = difficulties[currentDifficulty];
+    let spawnEvery = currentSetup.spawnBase;
+    let slowUntil = 0;
+    let whitePowerUntil = 0;
+    let nextWhitePowerAt = 0;
+    let nextRocketAt = 0;
+    let nextEventScore = EVENT_STEP;
+    let comboStreak = 0;
+    let comboMultiplier = 1;
+    let comboUntil = 0;
+    let alienSpawnTimer = 0;
+    let alienSpawnEvery = 300;
+    let records = loadRecords();
+
+    function loadRecords() {
+      const raw = localStorage.getItem(recordsKey);
+      if (!raw) return blankRecords();
+      try {
+        const parsed = JSON.parse(raw);
+        return ["easy", "normal", "hard"].reduce((acc, key) => {
+          acc[key] = Array.isArray(parsed[key]) ? parsed[key] : [];
+          return acc;
+        }, {});
+      } catch {
+        return blankRecords();
+      }
+    }
+
+    function saveRecords() {
+      localStorage.setItem(recordsKey, JSON.stringify(records));
+    }
+
+    function updateRecords(scoreValue) {
+      records[currentDifficulty] = [...records[currentDifficulty], scoreValue].sort((a, b) => b - a).slice(0, 7);
+      saveRecords();
+    }
+
+    function renderRecords() {
+      const board = records[menuDifficultyEl.value];
+      recordsBodyEl.innerHTML = "";
+      if (!board.length) {
+        const row = document.createElement("tr");
+        row.innerHTML = "<td colspan='2'>Пока нет рекордов</td>";
+        recordsBodyEl.appendChild(row);
+        return;
+      }
+      board.forEach((item, i) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td>${i + 1}</td><td>${item}</td>`;
+        recordsBodyEl.appendChild(row);
+      });
+    }
+
+    function resetGame() {
+      hasStarted = true;
+      player.x = canvas.width / 2 - player.w / 2;
+      lasers = [];
+      meteors = [];
+      bonuses = [];
+      rockets = [];
+      aliens = [];
+      score = spawnTimer = slowUntil = whitePowerUntil = nextWhitePowerAt = 0;
+      nextRocketAt = 0;
+      comboStreak = 0;
+      comboMultiplier = 1;
+      comboUntil = 0;
+      alienSpawnTimer = 0;
+      alienSpawnEvery = 300;
+      gameOver = false;
+      currentSetup = difficulties[currentDifficulty];
+      spawnEvery = currentSetup.spawnBase;
+      nextEventScore = EVENT_STEP;
+      scoreEl.textContent = finalScoreEl.textContent = "0";
+      comboLabelEl.textContent = "";
+      powerLabelEl.textContent = "";
+      gameOverTitleEl.textContent = "Конец игры";
+      gameOverEl.classList.remove("show");
+      startMenuEl.classList.remove("show");
+      requestAnimationFrame(loop);
+    }
+
+    function getEyePoints() {
+      const cx = player.x + player.w / 2;
+      const y = player.y - 30;
+      return [{ x: cx - 7, y }, { x: cx + 7, y }];
+    }
+
+    function shoot(targetX, targetY) {
+      if (gameOver || !hasStarted) return;
+      getEyePoints().forEach((eye) => addLaser(eye, targetX, targetY));
+    }
+
+    function launchRocket() {
+      if (gameOver || !hasStarted) return;
+      const now = performance.now();
+      if (now < nextRocketAt) return;
+      nextRocketAt = now + 3000;
+      rockets.push({
+        x: player.x + player.w / 2,
+        y: player.y - 34,
+        w: 10,
+        h: 18,
+        speed: 6.5
+      });
+    }
+
+    function spawnMeteor() {
+      const size = 26 + Math.random() * 22;
+      const baseSpeed = Math.min(
+        currentSetup.speedBase + Math.random() * currentSetup.speedRand + score * currentSetup.scoreScale,
+        currentSetup.speedCap
+      );
+      const roll = Math.random();
+      const type = roll < 0.58 ? "normal" : roll < 0.83 ? "fast" : "heavy";
+      const meteor = {
+        type,
+        x: Math.random() * (canvas.width - size),
+        y: -size - 8,
+        w: size,
+        h: size,
+        speed: baseSpeed,
+        hp: 1,
+        points: 1,
+        vx: 0
+      };
+      if (type === "fast") {
+        meteor.speed = Math.min(baseSpeed * 1.45, currentSetup.speedCap + 1.4);
+        meteor.points = 2;
+        meteor.vx = (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.55);
+      } else if (type === "heavy") {
+        meteor.speed = Math.max(0.7, baseSpeed * 0.72);
+        meteor.hp = 2;
+        meteor.points = 3;
+      }
+      meteors.push(meteor);
+    }
+
+    function spawnAlien() {
+      const w = 64;
+      const h = 28;
+      const fromLeft = Math.random() < 0.5;
+      const speed = 1.5 + Math.random() * 1.3 + Math.min(1.2, score * 0.01);
+      aliens.push({
+        x: fromLeft ? -w - 8 : canvas.width + 8,
+        y: 56 + Math.random() * (canvas.height * 0.45),
+        w,
+        h,
+        vx: fromLeft ? speed : -speed,
+        hp: 2
+      });
+    }
+
+    function spawnBonus() {
+      const size = 24;
+      bonuses.push({
+        type: Math.random() < 0.5 ? "star" : "comet",
+        x: Math.random() * (canvas.width - size),
+        y: -size - 8,
+        w: size,
+        h: size,
+        speed: 2.2
+      });
+    }
+
+    function meteorPointsSum(arr) {
+      return arr.reduce((sum, m) => sum + (m.points || 1), 0);
+    }
+
+    function spawnBonusWave(type, count, gap, speed) {
+      for (let i = 0; i < count; i += 1) {
+        const size = 24;
+        bonuses.push({
+          type,
+          x: Math.random() * (canvas.width - size),
+          y: -size - i * gap,
+          w: size,
+          h: size,
+          speed
+        });
+      }
+    }
+
+    function runScoreEvents() {
+      while (score >= nextEventScore) {
+        const eventId = Math.floor(Math.random() * 3);
+        if (eventId === 0) {
+          spawnBonusWave("comet", 10, 32, 2.6);
+        } else if (eventId === 1) {
+          spawnBonusWave("star", 12, 26, 2.8);
+        } else {
+          const size = 92;
+          meteors.push({
+            x: Math.random() * (canvas.width - size),
+            y: -size - 12,
+            w: size,
+            h: size,
+            speed: Math.min(currentSetup.speedBase * 0.75 + score * currentSetup.scoreScale * 0.3, 3.2),
+            hp: 3,
+            points: 10
+          });
+        }
+        nextEventScore += EVENT_STEP;
+      }
+    }
+
+    function awardMeteorPoints(amount) {
+      if (amount <= 0) return;
+      const now = performance.now();
+      if (now < comboUntil) comboStreak += 1;
+      else comboStreak = 1;
+      comboUntil = now + COMBO_WINDOW_MS;
+      comboMultiplier = Math.min(COMBO_MAX, 1 + Math.floor(comboStreak / 2));
+      comboLabelEl.textContent = comboMultiplier > 1 ? `Комбо x${comboMultiplier}` : "";
+      score += Math.max(1, Math.round(amount * comboMultiplier));
+      scoreEl.textContent = String(score);
+      runScoreEvents();
+      if (score >= 100) endGame("Ты чемпион");
+    }
+
+    function activateBonus(type, now) {
+      if (type === "star") {
+        const destroyed = meteorPointsSum(meteors);
+        meteors = [];
+        awardMeteorPoints(destroyed);
+      } else if (type === "comet") {
+        slowUntil = now + 5000;
+      }
+    }
+
+    function activateWhitePower() {
+      const now = performance.now();
+      if (now < nextWhitePowerAt) return;
+      whitePowerUntil = now + currentSetup.whiteDuration;
+      nextWhitePowerAt = now + currentSetup.whiteCooldown;
+      powerLabelEl.textContent = "Увайт павер активен!";
+    }
+
+    function update() {
+      player.x = clamp(player.x + (keys.right - keys.left) * player.speed, 0, canvas.width - player.w);
+
+      for (let i = lasers.length - 1; i >= 0; i -= 1) {
+        const l = lasers[i];
+        l.x += l.vx;
+        l.y += l.vy;
+        if (l.y + l.h < 0 || l.y > canvas.height || l.x + l.w < 0 || l.x > canvas.width) lasers.splice(i, 1);
+      }
+
+      for (let i = rockets.length - 1; i >= 0; i -= 1) {
+        const r = rockets[i];
+        let target = null;
+        let bestDist = Infinity;
+        for (let j = 0; j < meteors.length; j += 1) {
+          const m = meteors[j];
+          const tx = m.x + m.w / 2;
+          const ty = m.y + m.h / 2;
+          const d = Math.hypot(tx - r.x, ty - r.y);
+          if (d < bestDist) {
+            bestDist = d;
+            target = { x: tx, y: ty };
+          }
+        }
+
+        if (target) {
+          const dx = target.x - r.x;
+          const dy = target.y - r.y;
+          const len = Math.hypot(dx, dy) || 1;
+          r.x += (dx / len) * r.speed;
+          r.y += (dy / len) * r.speed;
+          bestDist = Math.hypot(target.x - r.x, target.y - r.y);
+        } else {
+          r.y -= r.speed;
+        }
+
+        const impact = !target ? r.y + r.h < 0 : bestDist < 16;
+        if (!impact) continue;
+        const blastX = r.x;
+        const blastY = r.y;
+        let gained = 0;
+        const nearest = meteors
+          .map((m, idx) => ({
+            idx,
+            dist: Math.hypot(m.x + m.w / 2 - blastX, m.y + m.h / 2 - blastY)
+          }))
+          .sort((a, b) => a.dist - b.dist)
+          .slice(0, 3)
+          .sort((a, b) => b.idx - a.idx);
+        nearest.forEach(({ idx }) => {
+          gained += meteors[idx].points || 1;
+          meteors.splice(idx, 1);
+        });
+        rockets.splice(i, 1);
+        awardMeteorPoints(gained);
+      }
+
+      alienSpawnTimer += 1;
+      if (alienSpawnTimer >= alienSpawnEvery) {
+        alienSpawnTimer = 0;
+        alienSpawnEvery = Math.max(130, 300 - Math.floor(score * 1.4));
+        spawnAlien();
+      }
+      for (let i = aliens.length - 1; i >= 0; i -= 1) {
+        const a = aliens[i];
+        a.x += a.vx;
+        if (a.x > canvas.width + a.w + 20 || a.x + a.w < -20) aliens.splice(i, 1);
+      }
+
+      spawnTimer += 1;
+      if (spawnTimer >= spawnEvery) {
+        spawnTimer = 0;
+        (Math.random() < 0.1 ? spawnBonus : spawnMeteor)();
+        spawnEvery = Math.max(currentSetup.spawnMin, currentSetup.spawnBase - Math.floor(score / 6));
+      }
+
+      const now = performance.now();
+      if (comboMultiplier > 1 && now >= comboUntil) {
+        comboStreak = 0;
+        comboMultiplier = 1;
+        comboLabelEl.textContent = "";
+      }
+      for (let i = bonuses.length - 1; i >= 0; i -= 1) {
+        const b = bonuses[i];
+        b.y += b.speed;
+        if (b.y > canvas.height + b.h) {
+          bonuses.splice(i, 1);
+          continue;
+        }
+        for (let j = lasers.length - 1; j >= 0; j -= 1) {
+          if (!intersects(lasers[j], b)) continue;
+          lasers.splice(j, 1);
+          bonuses.splice(i, 1);
+          activateBonus(b.type, now);
+          break;
+        }
+      }
+
+      if (now < whitePowerUntil) {
+        const destroyed = meteorPointsSum(meteors);
+        if (destroyed) {
+          meteors = [];
+          awardMeteorPoints(destroyed);
+        }
+      } else if (powerLabelEl.textContent) {
+        powerLabelEl.textContent = "";
+      }
+
+      // Пришельцы должны первыми перехватывать лазеры, чтобы реально заслонять метеоры.
+      for (let i = aliens.length - 1; i >= 0; i -= 1) {
+        const a = aliens[i];
+        for (let j = lasers.length - 1; j >= 0; j -= 1) {
+          if (!intersects(lasers[j], a)) continue;
+          lasers.splice(j, 1);
+          a.hp -= 1;
+          if (a.hp <= 0) aliens.splice(i, 1);
+          break;
+        }
+      }
+
+      const speedScale = now < slowUntil ? 0.45 : 1;
+      for (let i = meteors.length - 1; i >= 0; i -= 1) {
+        const m = meteors[i];
+        m.x += (m.vx || 0) * speedScale;
+        if (m.x < 0 || m.x + m.w > canvas.width) m.vx = -(m.vx || 0);
+        m.y += m.speed * speedScale;
+        if (m.y + m.h >= canvas.height) return endGame("Конец игры");
+        for (let j = lasers.length - 1; j >= 0; j -= 1) {
+          if (!intersects(lasers[j], m)) continue;
+          lasers.splice(j, 1);
+          m.hp = (m.hp || 1) - 1;
+          if (m.hp <= 0) {
+            meteors.splice(i, 1);
+            awardMeteorPoints(m.points || 1);
+          }
+          break;
+        }
+      }
+    }
+
+    function drawPlayer() {
+      const cx = player.x + player.w / 2;
+      const torsoTop = player.y - 32;
+      ctx.strokeStyle = ctx.fillStyle = "#ffffff";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx, torsoTop);
+      ctx.lineTo(cx, player.y);
+      ctx.moveTo(cx - 14, torsoTop + 10);
+      ctx.lineTo(cx + 14, torsoTop + 10);
+      ctx.moveTo(cx, player.y);
+      ctx.lineTo(cx - 12, player.y + 14);
+      ctx.moveTo(cx, player.y);
+      ctx.lineTo(cx + 12, player.y + 14);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, player.y - 44, 10, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawLasers() {
+      ctx.fillStyle = "#ff2a2a";
+      lasers.forEach((l) => ctx.fillRect(l.x - 1, l.y - 1, l.w + 2, l.h + 2));
+    }
+
+    function drawRockets() {
+      rockets.forEach((r) => {
+        ctx.fillStyle = "#ffe9a8";
+        ctx.beginPath();
+        ctx.moveTo(r.x, r.y - r.h / 2);
+        ctx.lineTo(r.x - r.w / 2, r.y + r.h / 2);
+        ctx.lineTo(r.x + r.w / 2, r.y + r.h / 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#ff7a3d";
+        ctx.fillRect(r.x - 2, r.y + r.h / 2 - 1, 4, 7);
+      });
+    }
+
+    function drawMeteors() {
+      meteors.forEach((m) => {
+        const r = m.w / 2;
+        const cx = m.x + r;
+        const cy = m.y + r;
+        ctx.fillStyle = m.type === "fast" ? "#ff8f52" : m.type === "heavy" ? "#6d788a" : "#b8684f";
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = m.type === "heavy" ? "#4c5562" : "#8e4634";
+        ctx.beginPath();
+        ctx.arc(cx - r * 0.25, cy - r * 0.1, r * 0.2, 0, Math.PI * 2);
+        ctx.arc(cx + r * 0.22, cy + r * 0.18, r * 0.16, 0, Math.PI * 2);
+        ctx.fill();
+        if (m.type === "heavy") {
+          ctx.strokeStyle = "#d8e2f3";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r * 0.6, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      });
+    }
+
+    function drawAliens() {
+      aliens.forEach((a) => {
+        const cx = a.x + a.w / 2;
+        const cy = a.y + a.h / 2;
+        // Корпус тарелки.
+        ctx.fillStyle = "#a8b9d8";
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 2, a.w * 0.46, a.h * 0.24, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Верхний купол.
+        ctx.fillStyle = "#90ffd4";
+        ctx.beginPath();
+        ctx.ellipse(cx, cy - a.h * 0.16, a.w * 0.2, a.h * 0.22, 0, Math.PI, Math.PI * 2);
+        ctx.lineTo(cx + a.w * 0.2, cy - a.h * 0.12);
+        ctx.lineTo(cx - a.w * 0.2, cy - a.h * 0.12);
+        ctx.closePath();
+        ctx.fill();
+
+        // Иллюминаторы.
+        ctx.fillStyle = "#ffe98b";
+        ctx.beginPath();
+        ctx.arc(cx - a.w * 0.2, cy + 1, 2.5, 0, Math.PI * 2);
+        ctx.arc(cx, cy + 2, 2.5, 0, Math.PI * 2);
+        ctx.arc(cx + a.w * 0.2, cy + 1, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Луч снизу (комиксный эффект).
+        ctx.fillStyle = "rgba(180, 255, 230, 0.18)";
+        ctx.beginPath();
+        ctx.moveTo(cx - a.w * 0.13, cy + a.h * 0.16);
+        ctx.lineTo(cx + a.w * 0.13, cy + a.h * 0.16);
+        ctx.lineTo(cx + a.w * 0.26, cy + a.h * 0.62);
+        ctx.lineTo(cx - a.w * 0.26, cy + a.h * 0.62);
+        ctx.closePath();
+        ctx.fill();
+      });
+    }
+
+    function drawBonuses() {
+      bonuses.forEach((b) => {
+        const cx = b.x + b.w / 2;
+        const cy = b.y + b.h / 2;
+        if (b.type === "star") {
+          ctx.fillStyle = "#ffe06a";
+          ctx.beginPath();
+          for (let i = 0; i < 10; i += 1) {
+            const angle = -Math.PI / 2 + (Math.PI / 5) * i;
+            const r = i % 2 ? b.w * 0.22 : b.w * 0.5;
+            const px = cx + Math.cos(angle) * r;
+            const py = cy + Math.sin(angle) * r;
+            i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+          }
+          ctx.closePath();
+          ctx.fill();
+          return;
+        }
+        ctx.fillStyle = "#8cd8ff";
+        ctx.beginPath();
+        ctx.arc(cx, cy, b.w * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#9be3ff";
+        ctx.beginPath();
+        ctx.moveTo(cx - b.w * 0.1, cy);
+        ctx.lineTo(cx - b.w * 0.7, cy + b.h * 0.38);
+        ctx.lineTo(cx - b.w * 0.32, cy + b.h * 0.1);
+        ctx.closePath();
+        ctx.fill();
+      });
+    }
+
+    function drawBackground() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "rgba(255,255,255,0.08)";
+      for (let i = 0; i < 50; i += 1) ctx.fillRect((i * 91) % canvas.width, (i * 57) % canvas.height, 2, 2);
+    }
+
+    function draw() {
+      drawBackground();
+      drawPlayer();
+      drawLasers();
+      drawRockets();
+      drawAliens();
+      drawMeteors();
+      drawBonuses();
+    }
+
+    function endGame(title) {
+      if (gameOver) return;
+      gameOver = true;
+      gameOverTitleEl.textContent = title;
+      finalScoreEl.textContent = String(score);
+      updateRecords(score);
+      gameOverEl.classList.add("show");
+    }
+
+    function loop() {
+      if (gameOver) return;
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function setMoveKey(key, value) {
+      if (key === "ArrowLeft" || key === "a" || key === "A") keys.left = value;
+      if (key === "ArrowRight" || key === "d" || key === "D") keys.right = value;
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (!hasStarted) return;
+      setMoveKey(e.key, true);
+      if (e.code === "Space") {
+        e.preventDefault();
+        activateWhitePower();
+      } else if (e.key === "Control") {
+        awardMeteorPoints(20);
+      }
+    });
+    window.addEventListener("keyup", (e) => setMoveKey(e.key, false));
+
+    canvas.addEventListener("mousedown", (e) => {
+      if (e.button || !hasStarted) return;
+      const rect = canvas.getBoundingClientRect();
+      shoot(
+        (e.clientX - rect.left) * (canvas.width / rect.width),
+        (e.clientY - rect.top) * (canvas.height / rect.height)
+      );
+    });
+    canvas.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      launchRocket();
+    });
+
+    menuDifficultyEl.addEventListener("change", renderRecords);
+    startBtn.addEventListener("click", () => {
+      currentDifficulty = menuDifficultyEl.value;
+      resetGame();
+    });
+    restartBtn.addEventListener("click", resetGame);
+    menuBtn.addEventListener("click", () => {
+      gameOverEl.classList.remove("show");
+      startMenuEl.classList.add("show");
+      hasStarted = false;
+      renderRecords();
+    });
+
+    renderRecords();
+  </script>
+</body>
+</html>
